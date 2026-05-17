@@ -65,14 +65,39 @@ def to_df(leads: list[Lead]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def render_filters(df: pd.DataFrame) -> pd.DataFrame:
+def render_filters(df: pd.DataFrame, key_prefix: str = "global") -> pd.DataFrame:
     cols = st.columns(5)
-    categories = cols[0].multiselect("Category", sorted(df["category"].dropna().unique()), default=list(df["category"].dropna().unique()))
-    sources = cols[1].multiselect("Source", sorted(df["source"].dropna().unique()), default=list(df["source"].dropna().unique()))
-    media = cols[2].multiselect("Media", sorted(df["media_type"].dropna().unique()), default=list(df["media_type"].dropna().unique()))
-    role = cols[3].multiselect("Role", sorted(df["role_type"].dropna().unique()), default=list(df["role_type"].dropna().unique()))
-    statuses = cols[4].multiselect("Status", sorted(df["status"].dropna().unique()), default=list(df["status"].dropna().unique()))
-    score_min = st.slider("Minimum score", 0, 100, 0)
+    categories = cols[0].multiselect(
+        "Category",
+        sorted(df["category"].dropna().unique()),
+        default=list(df["category"].dropna().unique()),
+        key=f"{key_prefix}_categories",
+    )
+    sources = cols[1].multiselect(
+        "Source",
+        sorted(df["source"].dropna().unique()),
+        default=list(df["source"].dropna().unique()),
+        key=f"{key_prefix}_sources",
+    )
+    media = cols[2].multiselect(
+        "Media",
+        sorted(df["media_type"].dropna().unique()),
+        default=list(df["media_type"].dropna().unique()),
+        key=f"{key_prefix}_media",
+    )
+    role = cols[3].multiselect(
+        "Role",
+        sorted(df["role_type"].dropna().unique()),
+        default=list(df["role_type"].dropna().unique()),
+        key=f"{key_prefix}_role",
+    )
+    statuses = cols[4].multiselect(
+        "Status",
+        sorted(df["status"].dropna().unique()),
+        default=list(df["status"].dropna().unique()),
+        key=f"{key_prefix}_statuses",
+    )
+    score_min = st.slider("Minimum score", 0, 100, 0, key=f"{key_prefix}_score_min")
     filtered = df[
         (df["category"].isin(categories))
         & (df["source"].isin(sources))
@@ -81,16 +106,20 @@ def render_filters(df: pd.DataFrame) -> pd.DataFrame:
         & (df["status"].isin(statuses))
         & (df["score"] >= score_min)
     ]
-    sort_col = st.selectbox("Sort by", ["score", "posted_date", "pay", "category"])
+    sort_col = st.selectbox("Sort by", ["score", "posted_date", "pay", "category"], key=f"{key_prefix}_sort")
     return filtered.sort_values(sort_col, ascending=False)
 
 
-def render_leads_table(df: pd.DataFrame, category: str | None = None) -> None:
+def render_leads_table(df: pd.DataFrame, category: str | None = None, key_prefix: str = "global") -> None:
     view = df if category is None else df[df["category"] == category]
     st.dataframe(view, use_container_width=True, hide_index=True)
-    lead_id = st.number_input("Lead ID to update status", min_value=0, step=1)
-    new_status = st.selectbox("New status", ["new", "shortlisted", "applied", "contacted", "ignored", "expired"])
-    if st.button("Update status"):
+    lead_id = st.number_input("Lead ID to update status", min_value=0, step=1, key=f"{key_prefix}_lead_id")
+    new_status = st.selectbox(
+        "New status",
+        ["new", "shortlisted", "applied", "contacted", "ignored", "expired"],
+        key=f"{key_prefix}_status",
+    )
+    if st.button("Update status", key=f"{key_prefix}_update_btn"):
         with get_session() as session:
             lead = session.get(Lead, int(lead_id))
             if lead:
@@ -124,20 +153,23 @@ with tab_overview:
         st.markdown("</div>", unsafe_allow_html=True)
         st.bar_chart(df.groupby("source")["id"].count())
         st.bar_chart(df.groupby("category")["id"].count())
-        filtered = render_filters(df)
-        render_leads_table(filtered)
+        filtered = render_filters(df, "overview")
+        render_leads_table(filtered, key_prefix="overview")
 
 with tab_wedding:
     if not df.empty:
-        render_leads_table(render_filters(df), "wedding")
+        wedding_filtered = render_filters(df, "wedding")
+        render_leads_table(wedding_filtered, "wedding", key_prefix="wedding")
 
 with tab_events:
     if not df.empty:
-        render_leads_table(render_filters(df), "event")
+        event_filtered = render_filters(df, "event")
+        render_leads_table(event_filtered, "event", key_prefix="event")
 
 with tab_general:
     if not df.empty:
-        render_leads_table(render_filters(df), "general")
+        general_filtered = render_filters(df, "general")
+        render_leads_table(general_filtered, "general", key_prefix="general")
 
 with tab_manual:
     pasted_text = st.text_area("Paste a post, email, WhatsApp message, Instagram caption, or advert", height=220)
