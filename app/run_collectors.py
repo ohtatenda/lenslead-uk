@@ -9,11 +9,14 @@ from app.config import get_settings
 from app.db import get_session, init_db
 from app.dedupe import is_duplicate
 from app.models import Lead, Run
+from app.relevance import has_hiring_intent
 
 
 def _save_leads(session: Session, leads: list[dict]) -> int:
     saved = 0
     for payload in leads:
+        if not has_hiring_intent(payload.get("title", ""), payload.get("description", "")):
+            continue
         if is_duplicate(session, payload):
             continue
         session.add(Lead(**payload))
